@@ -41,7 +41,7 @@ import net.imglib2.view.Views;
 
 
 
-public class HMaxPath<T extends RealType<T>> {
+public class HMaxPath2<T extends RealType<T>> {
 	
 //	RandomAccessibleInterval<IntType> labelMap;
 //	
@@ -87,52 +87,7 @@ public class HMaxPath<T extends RealType<T>> {
 	
 
 	
-	// keep this one as an example of neighborhood labeling
-	public static < T extends RealType< T > > List<Point> saddle_v2( final RandomAccessibleInterval< T > source )
-	{
-		
-		List<Point> saddlePoints = new ArrayList<Point>();
-		
-		RectangleShape shape = new RectangleShape(1,true);
-		RandomAccessible<T> sourceX = Views.extendBorder( source );
-		RandomAccess<Neighborhood<T>> neighs = shape.neighborhoodsRandomAccessible(sourceX).randomAccess();
-		Cursor<T> sourceCursor = Views.iterable( source ).cursor();
-		int[] clockWiseIdx = new int[] {0,1,2,7,3,6,5,4}; // assuming a line/row scanning of the 2d neighborhood, will order value in a clockwise manner
-		float[] neighVal = new float[8];
-		int count=0;
-		while( sourceCursor.hasNext() )
-		{
-			sourceCursor.fwd();
-			neighs.setPosition( sourceCursor );
-			count=0;
-			for( T t : neighs.get() )
-			{
-				neighVal[clockWiseIdx[count]] = t.getRealFloat();
-				count++;
-			}
-			float ref = sourceCursor.get().getRealFloat();
-			int prev=0;
-			int nLabel=0;
-			for(int i=0; i<8; i++)
-			{	
-				if( neighVal[i]<ref ){
-					prev=0;
-				}
-				else {
-					if( prev==0 ){	
-						nLabel++;
-						prev = nLabel;
-					}
-				}
-			}
-			if(prev>0 && neighVal[0]>ref)
-				nLabel--;
-			if( nLabel>=2)
-				saddlePoints.add(new Point( sourceCursor ) );
-		}
-		
-		return saddlePoints;
-	}
+	
 	
 	
 	public List<Point> saddle_v3( final RandomAccessibleInterval< T > source, final boolean[] isSaddle )
@@ -165,117 +120,6 @@ public class HMaxPath<T extends RealType<T>> {
 		return saddlePoints;
 	}
 	
-	
-
-	
-	// still pseudo saddle not detected by the approach: in the case two min path are in the same min reg
-	// minParent
-	public List<Point> getMinPathStart2( Point saddle , final RandomAccessibleInterval< T > source ) {
-		// get the 4C min point
-		// get the next step of each min path point of
-		//	if one is the start of another min path reject this start point
-		
-		List<Point> minPathStarts = new ArrayList<Point>();
-		
-		// define nd Moore and VonNeuman neighborhoods
-		final DiamondTipsShape shape4C = new DiamondTipsShape(1);
-		final RandomAccess<Neighborhood<T>> neigh4CRA = shape4C.neighborhoodsRandomAccessible( Views.extendBorder(source) ).randomAccess();
-		final RectangleShape shape8C = new RectangleShape(1,true);
-		final RandomAccess<Neighborhood<T>> neigh8CRA = shape8C.neighborhoodsRandomAccessible( Views.extendBorder(source) ).randomAccess();
-
-		final RandomAccess<T> sourceRA = source.randomAccess();
-		sourceRA.setPosition(saddle);
-		final T saddleT = sourceRA.get();
-		
-		neigh4CRA.setPosition( saddle );
-		final Cursor<T> saddleNeighborhood = neigh4CRA.get().cursor();
-		while( saddleNeighborhood.hasNext() ) {
-			if( saddleNeighborhood.next().compareTo(saddleT) < 0 ) {
-				minPathStarts.add( new Point(saddleNeighborhood) );
-			}	
-		}
-		
-		
-		
-		// check if some path start are equivalent: i.e. if they are part of the same min reg
-		// build a parent array indicating the reference path start (Map<Point,Point>)
-					
-		
-		
-		// Check minPath start validity: minPath is invalid if its second step merge it with another minpath start
-		int nMinPath = minPathStarts.size();
-		
-		boolean[] discard = new boolean[nMinPath];
-		for( int i=0 ; i<nMinPath  ; i++ )
-			discard[i] = false;
-		
-		for( int i=0 ; i<nMinPath  ; i++ ) {
-			final Point step0 = minPathStarts.get( i );
-			sourceRA.setPosition( step0 );
-			float step0Val = sourceRA.get().getRealFloat();
-			
-			// get the next point in the min path
-			Point step1 = new Point( step0 ); // if step0 is a minimum then it will be detected has the end of the path
-			float minVal = step0Val;
-			
-			neigh4CRA.setPosition( step0  );
-			final Cursor<T> neighborhood = neigh4CRA.get().cursor();
-			while( neighborhood.hasNext() ) {
-				float val = neighborhood.next().getRealFloat();
-				if( val < minVal ) {
-					minVal = val;
-					step1.setPosition( neighborhood );
-				}	
-			}
-			
-			if( step1.equals( step0 ) ) {
-			
-				neigh8CRA.setPosition( step0  );
-				final Cursor<T> neighborhood2 = neigh8CRA.get().cursor();
-				while( neighborhood2.hasNext() ) {
-					float val = neighborhood2.next().getRealFloat();
-					if( val < minVal ) {
-						minVal = val;
-						step1.setPosition( neighborhood2 );
-					}	
-				}
-				
-			}
-
-			
-
-			
-			// check if the position match with one of the other path start
-			if( !step1.equals(step0)  &&  minPathStarts.contains(step1)  )
-				discard[i]=true;
-//			for( int j=0 ; j< nMinPath ; j++ ) {
-//				if (j!=i ) {
-//					if( step1.equals( minPathStarts.get(j) ) ) {
-//						discard[ i ] = true;
-//						break;
-//					}
-//				}
-//			}	
-			
-			
-			System.out.println("-------------------------------------");
-			System.out.println("step0: " + step0.toString() );
-			System.out.println("step1: " + step1.toString() );
-			System.out.println("discard: " + discard[i] );
-
-			
-		}
-		
-		// create a new minPathStart list with the valid start
-		List<Point> minPathStarts2 = new ArrayList<Point>();
-		for( int i=0 ; i<nMinPath  ; i++ ) {
-			if ( !discard[i] ) {
-				minPathStarts2.add( minPathStarts.get(i) );
-			}
-		}
-		
-		return  minPathStarts2;
-	}
 	
 
 	
@@ -480,7 +324,7 @@ public class HMaxPath<T extends RealType<T>> {
 		
 		List<Point> saddlePoints2=null ;
 		final boolean[] isSaddle = Util.saddleConfiguration();
-		HMaxPath<FloatType> detector = new HMaxPath<FloatType>();
+		HMaxPath2<FloatType> detector = new HMaxPath2<FloatType>();
 		for(int n=0;n<20; n++)
 		{
 			saddlePoints2 = detector.saddle_v3( img2 , isSaddle );
