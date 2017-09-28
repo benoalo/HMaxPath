@@ -467,7 +467,7 @@ public class HMaxPath<T extends RealType<T>> {
 		ImageJ ij = new ImageJ();
 		ij.ui().showUI();
 		
-		Dataset dataset = (Dataset) ij.io().open("/Users/lombardo/workspace/test_images/blobs_smooth.tif");
+		Dataset dataset = (Dataset) ij.io().open("C:/Users/Ben/workspace/testImages/blobs_smooth.tif");
 		Img<FloatType> img = (Img<FloatType>) dataset.getImgPlus();
 		
 		Img<FloatType> img2 = ij.op().convert().float32( img );
