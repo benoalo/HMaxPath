@@ -99,6 +99,13 @@
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2-ij</artifactId>
 		</dependency>
+		
+		<dependency>
+			<groupId>de.mpicbg.scf</groupId>	
+			<artifactId>SCF_ImgAlgo</artifactId>
+			<version>0.1.0</version>
+		</dependency>
+        
     </dependencies>
 
 

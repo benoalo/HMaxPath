@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import de.mpicbg.scf.imgalgo.util.Pixel;
 import ij.ImagePlus;
 import ij.gui.Overlay;
 import ij.gui.PointRoi;
@@ -21,6 +22,7 @@ Author: Benoit Lombardot,  2017
 */
 
 import net.imglib2.Cursor;
+import net.imglib2.FinalInterval;
 import net.imglib2.Point;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessible;
@@ -30,11 +32,14 @@ import net.imglib2.algorithm.neighborhood.Neighborhood;
 import net.imglib2.algorithm.neighborhood.RectangleShape;
 import net.imglib2.img.Img;
 import net.imglib2.img.display.imagej.ImageJFunctions;
+import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.ByteType;
+import net.imglib2.type.numeric.integer.UnsignedByteType;
 import net.imglib2.type.numeric.real.DoubleType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Intervals;
+import net.imglib2.util.Util;
 import net.imglib2.view.Views;
 
 
@@ -104,6 +109,8 @@ public class HMaxPath2<T extends RealType<T>> {
 		final RandomAccessible<T> sourceX = Views.extendBorder( source );
 		final RandomAccess<Neighborhood<T>> neighs = shape.neighborhoodsRandomAccessible(sourceX).randomAccess();
 		final Cursor<T> sourceCursor = Views.iterable( source ).cursor();
+		
+		int count=0;
 		while( sourceCursor.hasNext() )
 		{
 			final T t = sourceCursor.next();
@@ -115,12 +122,99 @@ public class HMaxPath2<T extends RealType<T>> {
 					idx += vals[i];
 			if ( isSaddle[idx] )
 				saddlePoints.add(new Point( sourceCursor ) );
+			
+			if(count<10)
+				System.out.print(idx + "\t");;
+			count++;
 		}
+		System.out.print( "\n" );
 	
 		return saddlePoints;
 	}
 	
 	
+	
+	
+	public List<Point> saddle_v4( final RandomAccessibleInterval< T > source, final boolean[] isSaddle )
+	{
+		final List<Point> saddlePoints = new ArrayList<Point>();
+		
+		Img<IntType>  localPatternImg  = Util.getArrayOrCellImgFactory( source, new IntType() ).create(source, new IntType());
+		
+		final int numNeighbor = 8;
+		final int[] vals = new int[numNeighbor];
+		for(int i=0; i< numNeighbor; i++) {
+			vals[i]= (int)Math.pow(2, i);
+		}
+		
+		int ndim = source.numDimensions();
+		long[] dims = new long[ndim];
+		source.dimensions(dims);
+		
+		// define the connectivity
+		long[][] neigh = Pixel.getConnectivityPos(ndim , Pixel.Connectivity.FULL);
+		
+		int neighId = 0;
+		for( long[] delta : neigh ) {
+			
+			long[] min = new long[ndim];
+			long[] max = new long[ndim];
+			for(int d=0; d<ndim ; d++) {
+				min[d] = Math.max( 0			, delta[d]			 );
+				max[d] = Math.min( dims[d]-1	, dims[d]-1+delta[d] );
+				
+				//System.out.println("d="+d+"  ;  [min,max]=["+min[d]+","+max[d]+"]");  
+			}
+			FinalInterval intervalNeigh = new FinalInterval(min, max);
+			final Cursor<T> neighCursor = Views.flatIterable( Views.interval(source, intervalNeigh) ).cursor();
+			
+			long[] mind = new long[ndim];
+			long[] maxd = new long[ndim];
+			for(int d=0; d<ndim ; d++) {
+				mind[d] = min[d]-delta[d];
+				maxd[d] = max[d]-delta[d];
+			}
+			FinalInterval intervalDest = new FinalInterval(mind,maxd);
+			final Cursor<IntType> destCursor = Views.flatIterable( Views.interval( localPatternImg, intervalDest) ).cursor();
+			FinalInterval intervalSource = new FinalInterval(mind,maxd);
+			final Cursor<T> sourCursor = Views.flatIterable( Views.interval( source, intervalSource) ).cursor();
+			
+			
+			
+			while( neighCursor.hasNext() )
+			{
+				
+				final T t = sourCursor.next();
+				final T tn = neighCursor.next();
+				
+				if ( tn.compareTo( t ) > 0 )
+				{	
+					destCursor.next().add( new IntType(vals[neighId]) );
+					
+				}			
+			}
+			neighId++;
+		}
+		
+		
+		int count = 0;
+		Cursor<IntType> cursor = localPatternImg.cursor();
+		while( cursor.hasNext() )
+		{
+			int val = cursor.next().getInteger();
+			//System.out.println(val);
+			if ( isSaddle[val] )
+			{
+				//System.out.println("hello saddle");
+				saddlePoints.add(new Point( cursor ) );
+			}
+			if(  count < 10 )
+				System.out.print( val + "\t" );
+			count++;
+		}
+		//System.out.println(saddlePoints.size());
+		return saddlePoints;
+	}
 
 	
 
@@ -311,7 +405,8 @@ public class HMaxPath2<T extends RealType<T>> {
 		ImageJ ij = new ImageJ();
 		ij.ui().showUI();
 		
-		Dataset dataset = (Dataset) ij.io().open("/Users/lombardo/workspace/test_images/blobs_smooth.tif");
+		Dataset dataset = (Dataset) ij.io().open("C:/Users/Ben/workspace/testImages/blobs_smooth.tif");
+		//Dataset dataset = (Dataset) ij.io().open("/Users/lombardo/workspace/test_images/blobs_smooth.tif");
 		Img<FloatType> img = (Img<FloatType>) dataset.getImgPlus();
 		
 		Img<FloatType> img2 = ij.op().convert().float32( img );
@@ -323,17 +418,18 @@ public class HMaxPath2<T extends RealType<T>> {
 		//final Img<ByteType> img3 = ij.op().convert().int8( img );
 		
 		List<Point> saddlePoints2=null ;
-		final boolean[] isSaddle = Util.saddleConfiguration();
+		final boolean[] isSaddle = in.vizio.HMaxPath.Util.saddleConfiguration();
 		HMaxPath2<FloatType> detector = new HMaxPath2<FloatType>();
-		for(int n=0;n<20; n++)
+		for(int n=0;n<0; n++)
 		{
-			saddlePoints2 = detector.saddle_v3( img2 , isSaddle );
+			saddlePoints2 = detector.saddle_v4( img2 , isSaddle );
 		}
-		int nIter = 100;
+		int nIter = 1;
 		long start = System.nanoTime();
 		for(int n=0;n<nIter; n++)
 		{
 			saddlePoints2 = detector.saddle_v3( img2 , isSaddle );
+			saddlePoints2 = detector.saddle_v4( img2 , isSaddle );
 		}
 		long dt = System.nanoTime()-start;
 		System.out.println("dt " + (dt/nIter));

@@ -35,11 +35,9 @@ import ij.process.LUT;
 import net.imagej.ImageJ;
 import net.imagej.ops.AbstractOp;
 import net.imagej.ops.Op;
-import net.imglib2.algorithm.stats.ComputeMinMax;
 import net.imglib2.img.Img;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.RealType;
-import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 
 import org.scijava.ItemIO;
@@ -49,7 +47,7 @@ import org.scijava.plugin.Plugin;
 
 
 
-@Plugin(type = Op.class, name="HMaxima", menuPath = "SCF>Labeling>HMaxima", headless = true, label="HMaxima", visible=true)
+@Plugin(type = Op.class, name="HMaxPath", headless = true, label="HMaxPath")
 public class HMaxPath_Plugin extends AbstractOp  {
 
 	
